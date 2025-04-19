@@ -1,0 +1,17 @@
+# Core ML/Data Libraries
+torch
+transformers
+numpy
+pandas
+scikit-learn
+
+# Plotting
+matplotlib
+seaborn
+
+# Configuration & Utilities
+pyyaml
+tqdm
+scipy
+
+# Add any other specific dependencies if known 

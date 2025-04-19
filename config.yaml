@@ -1,0 +1,78 @@
+# config.yaml
+# Central configuration file for project parameters
+
+# --- Environment Setup ---
+# Path to activate the Python virtual environment
+env_activation_path: "/path/to/activate/python/virtual/environment"
+# Base directory for Hugging Face cache and models
+hf_home: "/path/to/save/huggingface/cache"
+# Disable tokenizer parallelism (often needed in cluster environments)
+tokenizers_parallelism: false
+# NOTE: HUGGING_FACE_HUB_TOKEN should be set as an environment variable, not hardcoded here.
+
+# --- Common Paths ---
+# Base directory where hidden states are stored
+base_hs_dir: "/path/to/save/hidden_states"
+# Base directory for labeled data CSV files
+base_label_dir: "/path/to/save/labeled_data"
+# Directory containing processed datasets
+processed_data_dir: "processed_data"
+# General base directory for generated plots and outputs (scripts may create subdirs)
+output_dir_base: "outputs"
+# Directory for log files
+log_dir: "logs"
+
+# --- Model Configuration ---
+model_name_llama2_7b_chat: "meta-llama/Llama-2-7b-chat-hf"
+model_name_llama3_8b_instruct: "meta-llama/Llama-3.1-8B-Instruct"
+model_name_perplexity_calc: "meta-llama/Llama-3.2-3B" # Used in run_preprocessing.py
+
+# --- Default Parameters ---
+default_batch_size: 16
+default_temperature: 0.7
+default_max_new_tokens: 50
+default_dim_reduce_method: "umap" # Options: pca, tsne, umap, zca_pca, zca_tsne, zca_umap
+default_time_bin_level: "period" # Options: year, period
+default_arrow_scale: 0.15 # For trajectory plots
+dbscan_eps: 0.5
+dbscan_min_samples: 5
+
+# --- Word & Method Lists (Space-separated) ---
+# Often used word list (Group 1 - Nouns)
+words_group1: "market:NOUN rate:NOUN bank:NOUN interest:NOUN investment:NOUN bond:NOUN share:NOUN capital:NOUN exchange:NOUN tax:NOUN growth:NOUN security:NOUN company:NOUN dollar:NOUN debt:NOUN equity:NOUN profit:NOUN loss:NOUN gain:NOUN decline:NOUN"
+# Often used word list (Group 2 - Nouns & Adj) - Also used by submit_dbscan
+words_group2_dbscan: "import:NOUN export:NOUN money:NOUN price:NOUN product:NOUN sale:NOUN agreement:NOUN annual:ADJ financial:ADJ net:ADJ industrial:ADJ traditional:ADJ monetary:ADJ inflationary:ADJ foreign:ADJ public:ADJ private:ADJ corporate:ADJ real:ADJ available:ADJ strong:ADJ stable:ADJ fair:ADJ competitive:ADJ"
+# Word list for submit_all_layers_dbscan.sh
+words_all_layers_dbscan: "import:NOUN export:NOUN"
+# Word list for submit_plot_semantic_shift.sh (without POS, handled in script)
+words_semantic_shift: "market rate bank interest investment bond share capital exchange tax growth security company dollar debt equity gain decline import export money price product sale agreement annual financial net industrial traditional monetary inflationary foreign public private corporate real available strong stable fair competitive profit loss"
+# Word list for submit_all_words_trajectory.sh (without POS)
+words_all_trajectory: "market rate bank interest investment bond share capital exchange tax growth security company dollar debt equity profit loss gain decline import export money price product sale agreement annual financial net industrial traditional monetary inflationary foreign public private corporate real available strong stable fair competitive"
+# Target words for submit_dataloader.sh
+words_dataloader: "gain,NOUN bank,NOUN" # Comma separated as used in script
+
+# Extraction methods used by most scripts
+methods_all: "input_last_token eos_token input_mean output_mean output_eos"
+# Subset of methods used by submit_rpcl, submit_word_traj_all, submit_all_layers_dbscan
+methods_subset1: "input_last_token eos_token output_mean"
+# Subset for submit_all_layers_dbscan
+methods_subset_dbscan: "input_last_token output_eos"
+# Default extraction method used in some scripts
+default_extraction_method: "input_last_token"
+
+# Dimension reduction methods for loops
+dimension_methods_all: "umap pca tsne"
+# Time bin levels for loops
+time_bin_levels: "year period"
+
+# Layer configurations (quotes might be needed depending on parser/usage)
+layer_configs_rpcl: "'0,5,10,15,20,25,30' '0-7' '24-31' '0,1,30,31' '0-31'"
+layer_configs_rpd: "'24-31'"
+
+# --- Data Paths (can be overridden by script logic/args) ---
+# Used by submit_create.sh
+data_paths_create_data: "processed_data/cs_bulletin_pdf_en_1014_Llama-3.1-8B_fp16_137666_perplexity_scores.csv processed_data/cs_bulletin_ocr_en_1009_Llama-3.1-8B_fp16_423396_perplexity_scores.csv"
+# Used by submit_prompt_experiments.sh
+data_path_prompt_exp: "processed_data/cs_bulletin_pdf_en_1014_Llama-2-7b_fp16_137666_perplexity_scores.csv"
+# Used by run_preprocessing.py (via submit_preprocessing.sh)
+data_path_preprocessing: "data/cs_bulletin_ocr_en_1009.csv" 
