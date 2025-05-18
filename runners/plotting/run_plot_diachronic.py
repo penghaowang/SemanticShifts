@@ -5,49 +5,49 @@ import numpy as np
 import logging
 import pandas as pd
 
-# 从 evaluate.py 导入刚才写好的函数
+# Import functions written earlier from evaluate.py
 from evaluate import merge_label, resolve_file_path, get_time_periods
 from plot import plot_hidden_states_layers, fix_tensor_from_series
 from logger_config import setup_logger
 
-# 设置日志
+# Set up logging
 logger = setup_logger('run_plot', 'logs/run_plot.log')
 
 def main():
-    # 定义命令行参数
+    # Define command line arguments
     parser = argparse.ArgumentParser(description="Run plot_hidden_states_layers with hidden states and optional labels")
     parser.add_argument('--hidden_states_dir', type=str, required=True, help='Path to hidden states tensor file (.pt)')
     parser.add_argument('--sentence_csv', type=str, required=True, help='Path to the sentence CSV file')
     parser.add_argument('--label_csv', type=str, required=True, help='Path to the label CSV file')
     parser.add_argument('--output_dir', type=str, default='plot_output', help='Where to save the plots')
-    parser.add_argument('--method', type=str, default='umap', choices=['pca', 'tsne', 'umap', 'zca_pca', 'zca_tsne', 'zca_umap'], help='降维方法')
-    parser.add_argument('--layers', type=str, required=False, help='要分析的层，例如"0,1,2"或"0-5"')
-    parser.add_argument('--word', type=str, required=False, help='目标词')
-    parser.add_argument('--extraction_method', type=str, required=False, help='提取方法')
+    parser.add_argument('--method', type=str, default='umap', choices=['pca', 'tsne', 'umap', 'zca_pca', 'zca_tsne', 'zca_umap'], help='Dimensionality reduction method')
+    parser.add_argument('--layers', type=str, required=False, help='Layers to analyze, e.g., "0,1,2" or "0-5"')
+    parser.add_argument('--word', type=str, required=False, help='Target word')
+    parser.add_argument('--extraction_method', type=str, required=False, help='Extraction method')
     args = parser.parse_args()
 
-    # 查找隐藏状态文件
+    # Find hidden states file
     hidden_states_file = resolve_file_path(
         args.hidden_states_dir,
         "*.pt", 
-        f"未找到隐藏状态文件: {args.hidden_states_dir}",
+        f"Hidden states file not found: {args.hidden_states_dir}",
         logger
     )
     
     if hidden_states_file is None:
         return
 
-    # 检查必要的CSV文件是否存在
+    # Check if necessary CSV files exist
     if not os.path.exists(args.sentence_csv):
-        logger.error(f"句子CSV文件不存在: {args.sentence_csv}")
+        logger.error(f"Sentence CSV file does not exist: {args.sentence_csv}")
         return
     
     if not os.path.exists(args.label_csv):
-        logger.error(f"标签CSV文件不存在: {args.label_csv}")
+        logger.error(f"Label CSV file does not exist: {args.label_csv}")
         return
 
-    # 执行 merge_label
-    logger.info("开始合并并绘制带标签的散点图。")
+    # Execute merge_label
+    logger.info("Starting merge and plotting labeled scatter plot.")
     df_merged = merge_label(
         hs_pt_file=hidden_states_file,
         sentence_csv_file=args.sentence_csv,
@@ -56,21 +56,21 @@ def main():
     # filter out -1 label
     df_merged = df_merged[df_merged['label_index'] != -1]
     if df_merged.empty:
-        logger.error("合并结果为空，无法绘图。")
+        logger.error("Merge result is empty, cannot plot.")
         return
 
-    logger.info(f"合并完成，DataFrame 行数: {len(df_merged)}")
+    logger.info(f"Merge completed, DataFrame rows: {len(df_merged)}")
     
-    # 获取预定义的时间段
+    # Get predefined time periods
     time_periods = get_time_periods()
-    logger.info(f"使用预定义的时间段: {time_periods}")
+    logger.info(f"Using predefined time periods: {time_periods}")
     
-    # 为每个预定义的时间段生成图表
+    # Generate plots for each predefined time period
     for period in time_periods:
-        # 解析时间段字符串，例如"1990-2000"
+        # Parse time period string, e.g., "1990-2000"
         start_year, end_year = map(int, period.split('-'))
         
-        # 根据年份筛选数据
+        # Filter data by year
         period_df = df_merged[(df_merged['year'] >= start_year) & (df_merged['year'] <= end_year)]
         
         if period_df.empty:
@@ -79,11 +79,11 @@ def main():
         period_hidden_states = fix_tensor_from_series(period_df["hidden_states"])
         period_labels = period_df["definition"]
         
-        # 为每个时间段创建单独的输出目录
+        # Create separate output directory for each time period
         period_dir = os.path.join(args.output_dir, f"period_{period}")
         os.makedirs(period_dir, exist_ok=True)
         
-        # 绘制该时间段的图表
+        # Plot for this time period
         plot_hidden_states_layers(
             period_hidden_states, 
             labels=period_labels, 
@@ -92,7 +92,7 @@ def main():
             show_plots=False
         )
     
-    logger.info(f"所有时间段的图表已保存到目录: {args.output_dir}")
+    logger.info(f"Plots for all time periods saved to directory: {args.output_dir}")
 
 if __name__ == "__main__":
     main()

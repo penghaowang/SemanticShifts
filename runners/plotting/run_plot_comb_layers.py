@@ -6,24 +6,24 @@ import logging
 import pandas as pd
 import traceback
 
-# 从 evaluate.py 导入刚才写好的函数
+# Import functions written earlier from evaluate.py
 from evaluate import merge_label, resolve_file_path, get_time_periods
-from plot import plot_hidden_states_layers, fix_tensor_from_series, plot_all_layers_together_dbscan, plot_hidden_states
+from plot import plot_hidden_states_layers, fix_tensor_from_series, plot_hidden_states
 from logger_config import setup_logger
 
-# 设置日志
+# Set up logging
 logger = setup_logger('run_plot_comb_layers', 'logs/run_plot_comb_layers.log')
 
 def parse_layers_str(layers_str):
     """
-    解析层字符串，支持逗号分隔和范围表示法
-    例如: "0,1,2" 或 "0-5" 或 "0,1,5-7"
+    Parse layer string, supporting comma separation and range notation
+    Example: "0,1,2" or "0-5" or "0,1,5-7"
     
-    参数:
-        layers_str (str): 层字符串
+    Args:
+        layers_str (str): Layer string
         
-    返回:
-        list: 层索引列表
+    Returns:
+        list: List of layer indices
     """
     if not layers_str:
         return []
@@ -38,112 +38,112 @@ def parse_layers_str(layers_str):
         else:
             layers.append(int(part))
     
-    return sorted(list(set(layers)))  # 去重并排序
+    return sorted(list(set(layers)))  # Remove duplicates and sort
 
 def main():
     try:
-        # 定义命令行参数
+        # Define command line arguments
         parser = argparse.ArgumentParser(description="Run plot_hidden_states_layers with hidden states and optional labels")
         parser.add_argument('--hidden_states_dir', type=str, required=True, help='Path to hidden states tensor file (.pt)')
         parser.add_argument('--sentence_csv', type=str, required=True, help='Path to the sentence CSV file')
         parser.add_argument('--label_csv', type=str, required=True, help='Path to the label CSV file')
         parser.add_argument('--output_dir', type=str, default='plot_output', help='Where to save the plots')
-        parser.add_argument('--method', type=str, default='umap', choices=['pca', 'tsne', 'umap', 'zca_pca', 'zca_tsne', 'zca_umap'], help='降维方法')
-        parser.add_argument('--layers', type=str, required=True, help='要分析的层，例如"0,1,2"或"0-5"')
-        parser.add_argument('--word', type=str, required=False, help='目标词')
-        parser.add_argument('--extraction_method', type=str, required=False, help='提取方法')
+        parser.add_argument('--method', type=str, default='umap', choices=['pca', 'tsne', 'umap', 'zca_pca', 'zca_tsne', 'zca_umap'], help='Dimensionality reduction method')
+        parser.add_argument('--layers', type=str, required=True, help='Layers to analyze, e.g., "0,1,2" or "0-5"')
+        parser.add_argument('--word', type=str, required=False, help='Target word')
+        parser.add_argument('--extraction_method', type=str, required=False, help='Extraction method')
         args = parser.parse_args()
 
-        logger.info(f"开始处理：词={args.word}, 提取方法={args.extraction_method}, 层={args.layers}, 降维方法={args.method}")
+        logger.info(f"Starting processing: Word={args.word}, Extraction Method={args.extraction_method}, Layers={args.layers}, Reduction Method={args.method}")
         
-        # 查找隐藏状态文件
+        # Find hidden states file
         hidden_states_file = resolve_file_path(
             args.hidden_states_dir,
             "*.pt", 
-            f"未找到隐藏状态文件: {args.hidden_states_dir}",
+            f"Hidden states file not found: {args.hidden_states_dir}",
             logger
         )
         
         if hidden_states_file is None:
-            logger.error(f"未找到隐藏状态文件：{args.hidden_states_dir}")
+            logger.error(f"Hidden states file not found: {args.hidden_states_dir}")
             return 1
 
-        # 检查必要的CSV文件是否存在
+        # Check if necessary CSV files exist
         if not os.path.exists(args.sentence_csv):
-            logger.error(f"句子CSV文件不存在: {args.sentence_csv}")
+            logger.error(f"Sentence CSV file does not exist: {args.sentence_csv}")
             return 1
         
         if not os.path.exists(args.label_csv):
-            logger.error(f"标签CSV文件不存在: {args.label_csv}")
+            logger.error(f"Label CSV file does not exist: {args.label_csv}")
             return 1
 
-        # 执行 merge_label
-        logger.info("开始合并标签数据。")
+        # Execute merge_label
+        logger.info("Starting to merge label data.")
         df_merged = merge_label(
             hs_pt_file=hidden_states_file,
             sentence_csv_file=args.sentence_csv,
             label_csv_file=args.label_csv
         )
         
-        logger.info(f"合并前数据量: {len(df_merged)}, 标签为-1的行数: {sum(df_merged['label_index'] == -1)}")
+        logger.info(f"Data size before merge: {len(df_merged)}, Rows with label -1: {sum(df_merged['label_index'] == -1)}")
         
-        # filter out -1 and -3 label
+        # filter out -1 and -3 labels
         df_merged = df_merged[df_merged['label_index'] != -1]
         df_merged = df_merged[df_merged['label_index'] != -3]
 
         
-        logger.info(f"过滤label=-1和label=-3后的数据量: {len(df_merged)}")
+        logger.info(f"Data size after filtering label=-1 and label=-3: {len(df_merged)}")
         
         if df_merged.empty:
-            logger.error("合并结果为空，无法绘图。请检查标签数据。")
+            logger.error("Merge result is empty, cannot plot. Please check label data.")
             return 1
 
-        logger.info(f"合并完成，DataFrame 行数: {len(df_merged)}")
+        logger.info(f"Merge completed, DataFrame rows: {len(df_merged)}")
         
-        # 分析标签分布
+        # Analyze label distribution
         label_counts = df_merged['definition'].value_counts()
-        logger.info(f"标签分布: {label_counts.to_dict()}")
+        logger.info(f"Label distribution: {label_counts.to_dict()}")
         
-        # 解析要分析的层
+        # Parse layers to analyze
         layers = parse_layers_str(args.layers)
         if not layers:
-            logger.error(f"未能解析层参数: {args.layers}")
+            logger.error(f"Failed to parse layer argument: {args.layers}")
             return 1
         
-        logger.info(f"将分析以下层: {layers}")
+        logger.info(f"Will analyze the following layers: {layers}")
         
-        # 获取隐藏状态
+        # Get hidden states
         try:
             hidden_states = fix_tensor_from_series(df_merged["hidden_states"])
-            logger.info(f"隐藏状态张量形状: {hidden_states.shape}")
+            logger.info(f"Hidden states tensor shape: {hidden_states.shape}")
         except Exception as e:
-            logger.error(f"处理隐藏状态失败: {str(e)}")
+            logger.error(f"Failed to process hidden states: {str(e)}")
             return 1
         
         labels = df_merged["definition"]
         
-        # 创建输出目录
+        # Create output directory
         os.makedirs(args.output_dir, exist_ok=True)
         
-        # 提取指定层的隐藏状态
+        # Extract hidden states for specified layers
         num_layers = hidden_states.shape[1]
         selected_layers = [l for l in layers if l < num_layers]
         
         if not selected_layers:
-            logger.error(f"指定的层 {layers} 超出了隐藏状态的层数范围 (0-{num_layers-1})。")
+            logger.error(f"Specified layers {layers} are out of range for hidden states (0-{num_layers-1}).")
             return 1
         
-        logger.info(f"有效的层: {selected_layers}")
+        logger.info(f"Valid layers: {selected_layers}")
         
-        # 将所有选定层的隐藏状态合并在一起
+        # Combine hidden states from all selected layers
         combined_hidden_states = hidden_states[:, selected_layers, :]
-        # 将三维张量转换为二维：将所有选定层的特征连接在一起
+        # Convert 3D tensor to 2D: concatenate features from all selected layers
         combined_hidden_states = combined_hidden_states.reshape(combined_hidden_states.shape[0], -1)
         
-        logger.info(f"合并后的隐藏状态张量形状: {combined_hidden_states.shape}")
+        logger.info(f"Shape of combined hidden states tensor: {combined_hidden_states.shape}")
         
         save_path = os.path.join(args.output_dir, f'combined_layers_{args.method}.png')
-        logger.info(f"正在绘制合并层的图表: {selected_layers}")
+        logger.info(f"Plotting combined layers chart: {selected_layers}")
         
         plot_hidden_states(
             combined_hidden_states,
@@ -157,17 +157,17 @@ def main():
             top_n=3
         )
         
-        # 验证文件是否成功创建
+        # Verify if the file was created successfully
         if os.path.exists(save_path):
-            logger.info(f"图表已成功保存到: {save_path}")
+            logger.info(f"Chart saved successfully to: {save_path}")
         else:
-            logger.error(f"图表可能未成功保存，文件不存在: {save_path}")
+            logger.error(f"Chart might not have been saved successfully, file does not exist: {save_path}")
             return 1
             
         return 0
         
     except Exception as e:
-        logger.error(f"发生未捕获的异常: {str(e)}")
+        logger.error(f"An unhandled exception occurred: {str(e)}")
         logger.error(traceback.format_exc())
         return 1
 

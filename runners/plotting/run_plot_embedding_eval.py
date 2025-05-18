@@ -23,10 +23,10 @@ import os
 import traceback
 from pathlib import Path
 
-# 导入自定义日志配置
+# Import custom logger configuration
 from logger_config import setup_logger, TRACE
 
-# 设置模块特定的日志记录器
+# Set up module-specific logger
 logger = setup_logger('embedding_eval', 'logs/embedding_eval.log')
 
 class EmbeddingEvaluator:
@@ -46,7 +46,7 @@ class EmbeddingEvaluator:
             output_dir: Directory to save evaluation results
             log_file: Path to log file
         """
-        # 如果指定了自定义日志文件，重新配置日志记录器
+        # If a custom log file is specified, reconfigure the logger
         if log_file != 'logs/embedding_eval.log':
             global logger
             logger = setup_logger('embedding_eval', log_file)
@@ -58,14 +58,14 @@ class EmbeddingEvaluator:
         
         # Prepare vectors based on hidden states shape
         if hidden_states.ndim == 3:  # [samples, layers, dim]
-            logger.info(f"隐藏状态形状为 {hidden_states.shape} - 将评估每一层")
+            logger.info(f"Hidden states shape is {hidden_states.shape} - will evaluate each layer")
             self.n_layers = hidden_states.shape[1]
             self.word_vectors = [
                 hidden_states[:, layer_idx, :].cpu().numpy() 
                 for layer_idx in range(self.n_layers)
             ]
         else:  # [samples, dim]
-            logger.info(f"隐藏状态形状为 {hidden_states.shape} - 单层评估")
+            logger.info(f"Hidden states shape is {hidden_states.shape} - single layer evaluation")
             self.n_layers = 1
             self.word_vectors = [hidden_states.cpu().numpy()]
     

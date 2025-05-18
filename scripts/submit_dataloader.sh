@@ -12,36 +12,36 @@
 source ../scripts/load_config.sh
 load_yaml_config ../config.yaml
 
-# 加载必要的模块
+# Load necessary modules
 module load cray/23.12
 module load gcc-native/12.3
 module load cray-python/3.11.5
 module load cudatoolkit/24.3_12.3
 # load your env
 
-# 设置环境变量 (Using paths/settings from config)
+# Set environment variables (Using paths/settings from config)
 export TOKENIZERS_PARALLELISM=${TOKENIZERS_PARALLELISM:-false}
 
-# 创建日志目录 (Using path from config)
+# Create log directory (Using path from config)
 mkdir -p "$LOG_DIR"
 
-# 定义数据集路径 (Using paths from config)
+# Define dataset paths (Using paths from config)
 DATASETS=($DATA_PATHS_CREATE_DATA) # Assuming these are the correct datasets for this script too
 
-# 定义目标词（使用空格分隔）(Using list from config)
+# Define target words (space-separated) (Using list from config)
 TARGET_WORDS="$WORDS_DATALOADER" # Use comma-separated string from config
 
-# 定义上下文窗口大小 (Keep specific values here or move to config if shared)
+# Define context window sizes (Keep specific values here or move to config if shared)
 CONTEXT_WINDOWS=(0 1 2)
 
-# 循环处理每个上下文窗口大小
+# Loop through each context window size
 for window in "${CONTEXT_WINDOWS[@]}"; do
     echo "Processing context window size: $window"
-    
-    # 为每个窗口大小创建单独的输出目录 (Using base path from config)
-    WINDOW_OUTPUT_DIR="/capstor/scratch/cscs/phwang/datasets/window_${window}" # Keep specific path or use $OUTPUT_DIR_BASE
+
+    # Create a separate output directory for each window size (Using base path from config)
+    WINDOW_OUTPUT_DIR="datasets/window_${window}" # Keep specific path or use $OUTPUT_DIR_BASE
     mkdir -p "$WINDOW_OUTPUT_DIR"
-    
+
     # Run dataloader script (Using model name & batch size from config)
     srun python ../run_dataloader.py \
         --dataset_paths "${DATASETS[@]}" \
@@ -55,13 +55,13 @@ for window in "${CONTEXT_WINDOWS[@]}"; do
         --context_window $window \
         --duplicate_handling "remove" \
         --simple_filter True
-        
-    # 检查上一个命令的退出状态
+
+    # Check the exit status of the previous command
     if [ $? -ne 0 ]; then
         echo "Error processing context window size: $window"
         exit 1
     fi
-    
+
     echo "Completed processing for window size: $window"
 done
 

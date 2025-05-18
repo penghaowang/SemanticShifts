@@ -9,10 +9,10 @@ from logger_config import setup_logger
 
 
 
-# 设置模块特定的日志记录器
+# Set up module-specific logger
 logger = setup_logger('run_layer_plot', 'logs/run_layer_plot.log')
 
-#先对每一个词做这两个plot 然后对整体做这两个plot
+# First, make these two plots for each word, then make these two plots for the whole set
 
 def main():
     parser = argparse.ArgumentParser(description='Layer-wise plot')
@@ -21,97 +21,97 @@ def main():
     parser.add_argument('--method', type=str, required=True, help='Method name (e.g., input_last_token, eos_token)')
     args = parser.parse_args()
 
-    logger.info(f"开始处理层间相似度分析，基础目录: {args.base_hs_dir}，方法: {args.method}")
+    logger.info(f"Starting inter-layer similarity analysis, Base directory: {args.base_hs_dir}, Method: {args.method}")
     
-    # 确保输出目录存在
+    # Ensure output directory exists
     os.makedirs(args.output_dir, exist_ok=True)
-    logger.info(f"输出目录已创建: {args.output_dir}")
+    logger.info(f"Output directory created: {args.output_dir}")
 
-    # 查找所有包含该方法的隐藏状态目录
+    # Find all hidden state directories containing this method
     word_dirs_pattern = os.path.join(args.base_hs_dir, "*", args.method, "combined", "hidden_states_*")
     word_dirs = glob.glob(word_dirs_pattern)
     
     if not word_dirs:
-        logger.error(f"未找到任何匹配的隐藏状态目录: {word_dirs_pattern}")
+        logger.error(f"No matching hidden state directories found: {word_dirs_pattern}")
         return
     
-    logger.info(f"找到 {len(word_dirs)} 个词汇目录")
+    logger.info(f"Found {len(word_dirs)} vocabulary directories")
     
-    # 创建一个字典来存储每个词的层相似度
+    # Create a dictionary to store layer similarity for each word
     word_layer_similarities = {}
     all_layer_similarities = []
     
-    # 遍历每个词汇目录
+    # Iterate through each vocabulary directory
     for word_dir in word_dirs:
-        # 从目录路径中提取词汇名
+        # Extract vocabulary name from directory path
         word_folder = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(word_dir))))
-        logger.info(f"处理词汇目录: {word_folder}")
+        logger.info(f"Processing vocabulary directory: {word_folder}")
         
-        # 查找该目录中的所有隐藏状态文件
+        # Find all hidden state files in this directory
         hidden_states_files = glob.glob(os.path.join(word_dir, "*.pt"))
         
         if not hidden_states_files:
-            logger.warning(f"词汇目录 '{word_folder}' 中未找到隐藏状态文件，跳过")
+            logger.warning(f"No hidden state files found in vocabulary directory '{word_folder}', skipping")
             continue
         
-        logger.info(f"词汇 {word_folder} 找到 {len(hidden_states_files)} 个文件")
+        logger.info(f"Found {len(hidden_states_files)} files for vocabulary {word_folder}")
         
-        # 遍历该词汇的所有隐藏状态文件
+        # Iterate through all hidden state files for this vocabulary
         for file in hidden_states_files:
-            logger.info(f"处理文件: {file}")
+            logger.info(f"Processing file: {file}")
             
-            # 加载隐藏状态
+            # Load hidden states
             try:
                 hidden_states = torch.load(file)
-                logger.debug(f"加载隐藏状态，形状: {hidden_states.shape}")
+                logger.debug(f"Loaded hidden states, shape: {hidden_states.shape}")
                 
-                # 计算层级相似度
-                logger.info(f"计算 {word_folder} 的层间相似度")
+                # Calculate layer-wise similarity
+                logger.info(f"Calculating inter-layer similarity for {word_folder}")
                 layer_similarity = cosine_similarity_layers(hidden_states)
                 
-                # 存储该词的层相似度
+                # Store layer similarity for this word
                 word_key = f"{word_folder}_{os.path.basename(file)}"
                 word_layer_similarities[word_key] = layer_similarity.cpu().numpy() if isinstance(layer_similarity, torch.Tensor) else layer_similarity
                 
-                # 添加到总的层相似度列表
+                # Add to the total layer similarity list
                 all_layer_similarities.append(layer_similarity)
                 
-                # 绘制层级热图
-                heatmap_path = os.path.join(args.output_dir, f'{word_folder}_{os.path.basename(file)}_heatmap.png')
-                logger.info(f"绘制 {word_folder} 的层级热图，保存至: {heatmap_path}")
+                # Plot layer-wise heatmap
+                heatmap_path = os.path.join(args.output_dir, f"{word_folder}_{os.path.basename(file)}_heatmap.png")
+                logger.info(f"Plotting layer-wise heatmap for {word_folder}, saving to: {heatmap_path}")
                 plot_heatmap_layerwise(layer_similarity, heatmap_path)
                 
-                # 绘制相对相似度热图
-                rel_similarity_path = os.path.join(args.output_dir, f'{word_folder}_{os.path.basename(file)}_rel_similarity.png')
-                logger.info(f"绘制 {word_folder} 的相对相似度图，保存至: {rel_similarity_path}")
+                # Plot relative similarity heatmap
+                rel_similarity_path = os.path.join(args.output_dir, f"{word_folder}_{os.path.basename(file)}_rel_similarity.png")
+                logger.info(f"Plotting relative similarity plot for {word_folder}, saving to: {rel_similarity_path}")
                 plot_relative_similarity(layer_similarity, rel_similarity_path)
             except Exception as e:
-                logger.error(f"处理文件 {file} 时出错: {e}")
+                logger.error(f"Error processing file {file}: {e}")
     
-    # 如果有处理成功的词汇，则绘制总的图表
+    # If there are successfully processed vocabularies, plot the overall chart
     if all_layer_similarities:
-        logger.info("开始绘制所有词汇的综合层间相似度图")
+        logger.info("Starting to plot the overall inter-layer similarity chart for all vocabularies")
         
-        # 合并所有层相似度
+        # Merge all layer similarities
         try:
             all_layer_similarity = np.concatenate([sim.cpu().numpy() if isinstance(sim, torch.Tensor) else sim for sim in all_layer_similarities], axis=0)
-            logger.debug(f"合并后的层间相似度数组形状: {all_layer_similarity.shape}")
+            logger.debug(f"Shape of merged inter-layer similarity array: {all_layer_similarity.shape}")
             
-            # 绘制层级热图
-            heatmap_path = os.path.join(args.output_dir, 'all_words_layer_heatmap.png')
-            logger.info(f"绘制所有词汇的层级热图，保存至: {heatmap_path}")
+            # Plot layer-wise heatmap
+            heatmap_path = os.path.join(args.output_dir, "all_words_layer_heatmap.png")
+            logger.info(f"Plotting layer-wise heatmap for all vocabularies, saving to: {heatmap_path}")
             plot_heatmap_layerwise(all_layer_similarity, heatmap_path)
             
-            # 绘制相对相似度热图
-            rel_similarity_path = os.path.join(args.output_dir, 'all_words_rel_similarity.png')
-            logger.info(f"绘制所有词汇的相对相似度图，保存至: {rel_similarity_path}")
+            # Plot relative similarity heatmap
+            rel_similarity_path = os.path.join(args.output_dir, "all_words_rel_similarity.png")
+            logger.info(f"Plotting relative similarity plot for all vocabularies, saving to: {rel_similarity_path}")
             plot_relative_similarity(all_layer_similarity, rel_similarity_path)
         except Exception as e:
-            logger.error(f"合并层相似度数组失败: {e}")
+            logger.error(f"Failed to merge layer similarity arrays: {e}")
     else:
-        logger.warning("没有成功处理任何词汇，无法绘制综合图表")
+        logger.warning("No vocabularies processed successfully, cannot plot overall chart")
     
-    logger.info("层间相似度分析完成")
+    logger.info("Inter-layer similarity analysis completed")
 
 if __name__ == "__main__":
     main()

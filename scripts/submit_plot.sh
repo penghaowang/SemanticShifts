@@ -6,23 +6,23 @@
 #SBATCH --output=logs/submit_plot_%j.log  
 #SBATCH --error=logs/submit_plot_error_%j.log     
 #SBATCH --ntasks=4
-#SBATCH --account=a-a05
+#SBATCH --account=<your-account-id>
 #SBATCH --constraint=gpu
 #SBATCH --partition=normal
 #SBATCH --time=12:00:00
 
-# 加载必要的模块
+# Load necessary modules
 module load python gcc cuda
 
 # load your env
-# source /iopsstor/scratch/cscs/phwang/.myvenvs/llm/bin/activate
+# source /path/to/your/venv/bin/activate
 
-# 设置环境变量
-# Line removed by filter-repo due to potential secret # Keep this line if it exists elsewhere
+# Set environment variables
+# export HUGGING_FACE_HUB_TOKEN=<your-token-here>
 # export TOKENIZERS_PARALLELISM=false
-# export HF_HOME="/capstor/scratch/cscs/phwang"
+# export HF_HOME="/path/to/your/hf/cache"
 
-# 定义目标词（格式：word:POS）和提取方法列表
+# Define target words (format: word:POS) and list of extraction methods
 # words=("import:NOUN" "export:NOUN" "money:NOUN" "price:NOUN" "product:NOUN" 
 #     "sale:NOUN" "agreement:NOUN" "annual:ADJ" "financial:ADJ" "net:ADJ" 
 #     "industrial:ADJ" "traditional:ADJ" "monetary:ADJ" "inflationary:ADJ" "foreign:ADJ" 
@@ -34,64 +34,64 @@ words=("market:NOUN" "rate:NOUN" "bank:NOUN" "interest:NOUN" "investment:NOUN"
     "equity:NOUN" "profit:NOUN" "loss:NOUN" "gain:NOUN" "decline:NOUN")
 methods=("input_last_token" "eos_token" "input_mean" "output_mean" "output_eos")
 
-# 基础目录（根据实际情况调整）
-BASE_HS_DIR="/iopsstor/scratch/cscs/phwang/hidden_states"
-BASE_LABEL_DIR="/users/phwang/users/master_thesis2/labeled_data_o3_mini"
+# Base directory (adjust according to actual situation)
+BASE_HS_DIR="hidden_states"
+BASE_LABEL_DIR="labeled_data"
 OUTPUT_DIR_BASE="api_hs_plots"
 DIM_REDUCE_METHOD="umap"
 
-# 遍历每个词和提取方法
+# Iterate through each word and extraction method
 for word in "${words[@]}"; do
-    # 将冒号替换为下划线，构成目录名（如：import:NOUN -> import_NOUN）
+    # Replace colon with underscore to form directory name (e.g., import:NOUN -> import_NOUN)
     word_folder=$(echo "$word" | sed 's/:/_/g')
     
     for method in "${methods[@]}"; do
-        echo "开始处理 $word (目录：$word_folder) 提取方法: $method"
+        echo "Starting processing $word (Directory: $word_folder) Extraction method: $method"
 
-        # 隐藏状态文件：在 BASE_HS_DIR/word_folder/method/combined 下查找最新的 hidden_states_* 目录，
+        # Hidden states file: Find the hidden states file in the latest hidden_states_* directory under BASE_HS_DIR/word_folder/method/combined
         hs_dir_pattern="${BASE_HS_DIR}/${word_folder}/${method}/combined/hidden_states_*"
         hs_dir=$(ls -d $hs_dir_pattern 2>/dev/null | sort | tail -n 1)
         if [ -z "$hs_dir" ]; then
-            echo "未找到隐藏状态目录匹配模式: $hs_dir_pattern"
+            echo "Hidden states directory matching pattern not found: $hs_dir_pattern"
             continue
         fi
         HIDDEN_STATES_FILE="${hs_dir}/hidden_states_${word_folder}_hidden_states_${method}.pt"
         if [ ! -f "$HIDDEN_STATES_FILE" ]; then
-            echo "隐藏状态文件不存在: $HIDDEN_STATES_FILE"
+            echo "Hidden states file does not exist: $HIDDEN_STATES_FILE"
             continue
         fi
 
-        # 句子 CSV 文件：在 BASE_HS_DIR/word_folder/method/combined 下查找最新的 icl_basic_${method}_${word_folder}_* 目录，
+        # Sentence CSV file: Find the latest icl_basic_${method}_${word_folder}_* directory under BASE_HS_DIR/word_folder/method/combined
         sentence_dir_pattern="${BASE_HS_DIR}/${word_folder}/${method}/combined/icl_basic_${method}_${word_folder}_*"
         sentence_dir=$(ls -d $sentence_dir_pattern 2>/dev/null | sort | tail -n 1)
         if [ -z "$sentence_dir" ]; then
-            echo "未找到句子 CSV 目录匹配模式: $sentence_dir_pattern"
+            echo "Sentence CSV directory matching pattern not found: $sentence_dir_pattern"
             continue
         fi
         SENTENCE_CSV="${sentence_dir}/icl_basic_${method}_${word_folder}.csv"
         if [ ! -f "$SENTENCE_CSV" ]; then
-            echo "句子 CSV 文件不存在: $SENTENCE_CSV"
+            echo "Sentence CSV file does not exist: $SENTENCE_CSV"
             continue
         fi
 
-        # 标签 CSV 文件：假设在 BASE_LABEL_DIR 下，文件名格式为 ${word_folder}_labeled.csv
+        # Label CSV file: Assume it is under BASE_LABEL_DIR, with filename format ${word_folder}_labeled.csv
         LABEL_CSV="${BASE_LABEL_DIR}/${word_folder}_labeled.csv"
         if [ ! -f "$LABEL_CSV" ]; then
-            echo "标签 CSV 文件不存在: $LABEL_CSV"
+            echo "Label CSV file does not exist: $LABEL_CSV"
             continue
         fi
 
-        # 输出目录：按词和方法保存
+        # Output directory: Save by word and method
         OUTPUT_DIR="${OUTPUT_DIR_BASE}/${word_folder}/${method}_${DIM_REDUCE_METHOD}"
         mkdir -p "$OUTPUT_DIR"
 
-        echo "正在为 $word ($method) 生成图表..."
-        echo "隐藏状态文件: $HIDDEN_STATES_FILE"
-        echo "句子 CSV 文件: $SENTENCE_CSV"
-        echo "标签 CSV 文件: $LABEL_CSV"
-        echo "图表输出目录: $OUTPUT_DIR"
+        echo "Generating plots for $word ($method)..."
+        echo "Hidden states file: $HIDDEN_STATES_FILE"
+        echo "Sentence CSV file: $SENTENCE_CSV"
+        echo "Label CSV file: $LABEL_CSV"
+        echo "Plot output directory: $OUTPUT_DIR"
 
-        # 使用 srun 调用 Python 脚本
+        # Use srun to call Python script
         srun python ../plot/run_plot.py \
           --hidden_states_dir "$HIDDEN_STATES_FILE" \
           --sentence_csv "$SENTENCE_CSV" \
@@ -99,8 +99,8 @@ for word in "${words[@]}"; do
           --output_dir "$OUTPUT_DIR" \
           --method "$DIM_REDUCE_METHOD"
 
-        echo "处理 $word ($method) 完成。"
+        echo "Processing $word ($method) completed."
     done
 done
 
-echo "所有任务完成。"
+echo "All tasks completed."

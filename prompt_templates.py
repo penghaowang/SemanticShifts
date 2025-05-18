@@ -1,5 +1,5 @@
 """
-存储不同的prompt模板配置
+Stores configurations for different prompt templates
 """
 
 PROMPT_TEMPLATES = {

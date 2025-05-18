@@ -14,8 +14,8 @@ module load cray/23.12
 module load gcc-native/12.3
 module load cray-python/3.11.5
 module load cudatoolkit/24.3_12.3
-# Line removed by filter-repo due to potential secret
-# Line removed by filter-repo due to potential secret
+# export HUGGING_FACE_HUB_TOKEN=<your-token-here>
+# export TOKENIZERS_PARALLELISM=false
 # 6) Run Python script
 accelerate launch \
   --multi_gpu \

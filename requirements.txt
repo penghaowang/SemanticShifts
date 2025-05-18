@@ -4,14 +4,22 @@ transformers
 numpy
 pandas
 scikit-learn
+datasets
+accelerate
+joblib
 
-# Plotting
+# NLP & Text Processing
+spacy
+langdetect
+pandarallel
+
+# Visualization & Plotting
 matplotlib
 seaborn
+umap-learn
 
 # Configuration & Utilities
 pyyaml
 tqdm
 scipy
 
-# Add any other specific dependencies if known 

@@ -9,7 +9,7 @@ from dataloader import CustomDataLoader
 
 logger = setup_logger('create_data', 'logs/create_data.log')
 
-# 定义目标词列表
+# Define the target word list
 TARGET_ADJECTIVES = [
     'industrial', 'traditional', 'monetary', 'inflationary', 'foreign',
     'public', 'private', 'corporate', 'real', 'financial',
@@ -25,37 +25,37 @@ TARGET_NOUNS = [
 ]
 
 def create_target_word_pairs() -> List[Tuple[str, str]]:
-    """创建目标词和词性对的列表"""
+    """Create a list of target words and their POS tags"""
     word_pairs = []
-    # 添加形容词
+    # Add adjectives
     for adj in TARGET_ADJECTIVES:
         word_pairs.append((adj, 'ADJ'))
-    # 添加名词
+    # Add nouns
     for noun in TARGET_NOUNS:
         word_pairs.append((noun, 'NOUN'))
     return word_pairs
 
 def get_dataset_path(output_dir: str, word: str, pos: str) -> Path:
-    """生成数据集保存或加载路径"""
+    """Generate the save or load path for the dataset"""
     return Path(output_dir) / f"{word}_{pos}"
 
 def save_dataset(dataset: Dataset, output_dir: str, word: str, pos: str) -> None:
-    """保存数据集到指定目录"""
+    """Save the dataset to the specified directory"""
     save_path = get_dataset_path(output_dir, word, pos)
     save_path.mkdir(parents=True, exist_ok=True)
     dataset.save_to_disk(save_path)
-    logger.info(f"已保存 {word}:{pos} 数据集到 {save_path}")
+    logger.info(f"Saved {word}:{pos} dataset to {save_path}")
 
 def load_dataset(output_dir: str, word: str, pos: str) -> Optional[Dataset]:
-    """从保存的目录加载数据集"""
+    """Load the dataset from the saved directory"""
     load_path = get_dataset_path(output_dir, word, pos)
     if load_path.exists():
         try:
             dataset = Dataset.load_from_disk(load_path)
-            logger.info(f"已加载 {word}:{pos} 数据集从 {load_path}")
+            logger.info(f"Loaded {word}:{pos} dataset from {load_path}")
             return dataset
         except Exception as e:
-            logger.error(f"加载 {word}:{pos} 数据集失败: {e}")
+            logger.error(f"Failed to load {word}:{pos} dataset: {e}")
     return None
 
 def process_data(
@@ -67,31 +67,31 @@ def process_data(
     context_window: int = 3,
     force_reload: bool = False
 ) -> Dict[str, Dataset]:
-    """处理数据并保存/加载数据集"""
+    """Process data and save/load datasets"""
     
-    # 初始化tokenizer
+    # Initialize tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
-    # 获取目标词对列表
+    # Get the list of target word pairs
     target_word_pairs = create_target_word_pairs()
     
-    # 创建输出目录
+    # Create output directory
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
-    # 存储所有数据集
+    # Store all datasets
     datasets = {}
     
     for word, pos in target_word_pairs:
-        logger.info(f"处理 {word}:{pos}")
+        logger.info(f"Processing {word}:{pos}")
         
-        # 检查是否已存在保存的数据集
+        # Check if the saved dataset already exists
         if not force_reload:
             saved_dataset = load_dataset(output_dir, word, pos)
             if saved_dataset is not None:
                 datasets[f"{word}_{pos}"] = saved_dataset
                 continue
         
-        # 初始化数据加载器
+        # Initialize data loader
         dataloader = CustomDataLoader(
             tokenizer=tokenizer,
             target_words=[(word, pos)],
@@ -103,44 +103,44 @@ def process_data(
         )
         
         try:
-            # 加载和处理数据
+            # Load and process data
             dataset = dataloader.load_dataset(
                 data_paths=data_paths,
-                split_ratio=0  # 不分割数据集
+                split_ratio=0  # Do not split the dataset
             )
             
-            # 保存数据集
+            # Save the dataset
             save_dataset(dataset, output_dir, word, pos)
             
-            # 添加到结果字典
+            # Add to the results dictionary
             datasets[f"{word}_{pos}"] = dataset
             
         except Exception as e:
-            logger.error(f"处理 {word}:{pos} 失败: {e}")
+            logger.error(f"Failed to process {word}:{pos}: {e}")
             continue
     
     return datasets
 
 def main():
-    parser = argparse.ArgumentParser(description="创建并保存目标词数据集")
+    parser = argparse.ArgumentParser(description="Create and save target word datasets")
     parser.add_argument('--data_paths', type=str, nargs='+', required=True,
-                      help='输入数据文件路径')
+                      help='Input data file paths')
     parser.add_argument('--model_name', type=str, required=True,
-                      help='模型名称')
+                      help='Model name')
     parser.add_argument('--output_dir', type=str, required=True,
-                      help='输出目录')
+                      help='Output directory')
     parser.add_argument('--batch_size', type=int, default=32,
-                      help='批处理大小')
+                      help='Batch size')
     parser.add_argument('--max_length', type=int, default=2048,
-                      help='最大序列长度')
+                      help='Maximum sequence length')
     parser.add_argument('--context_window', type=int, default=3,
-                      help='上下文窗口大小')
+                      help='Context window size')
     parser.add_argument('--force_reload', action='store_true',
-                      help='强制重新加载所有数据集')
+                      help='Force reload all datasets')
     
     args = parser.parse_args()
     
-    # 处理数据
+    # Process data
     datasets = process_data(
         data_paths=args.data_paths,
         model_name=args.model_name,
@@ -151,10 +151,10 @@ def main():
         force_reload=args.force_reload
     )
     
-    # 打印统计信息
-    logger.info("数据集统计:")
+    # Print statistics
+    logger.info("Dataset statistics:")
     for name, dataset in datasets.items():
-        logger.info(f"{name}: {len(dataset)} 样本")
+        logger.info(f"{name}: {len(dataset)} samples")
 
 if __name__ == '__main__':
     main()

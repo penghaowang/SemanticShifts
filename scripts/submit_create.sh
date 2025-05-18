@@ -8,38 +8,38 @@
 #SBATCH --partition=normal
 #SBATCH --constraint=gpu
 
-# 加载环境
+# Load environment
 module load cray/23.12
 module load gcc-native/12.3
 module load cray-python/3.11.5
 module load cudatoolkit/24.3_12.3
 
-# 设置环境变量
-# Line removed by filter-repo due to potential secret
+# Set environment variables
+# export HUGGING_FACE_HUB_TOKEN=<your-token-here>
 export TOKENIZERS_PARALLELISM=false
 
-# 创建日志目录
+# Create log directory
 mkdir -p logs
 
-# 定义数据集路径
+# Define dataset paths
 DATASETS=(
     "processed_data/cs_bulletin_pdf_en_1014_Llama-3.1-8B_fp16_137666_perplexity_scores.csv"
     "processed_data/cs_bulletin_ocr_en_1009_Llama-3.1-8B_fp16_423396_perplexity_scores.csv"
 )
 
-# 定义context window范围
+# Define context window range
 CONTEXT_WINDOWS=(5 10 20)
 
-# 定义基础输出目录
-BASE_OUTPUT_DIR="/capstor/scratch/cscs/phwang/datasets/word_datasets"
+# Define base output directory
+BASE_OUTPUT_DIR="datasets/word_datasets"
 
-# 循环处理不同的context window
+# Loop through different context windows
 for window in "${CONTEXT_WINDOWS[@]}"; do
-    # 为每个context window创建单独的输出目录
+    # Create separate output directory for each context window
     OUTPUT_DIR="${BASE_OUTPUT_DIR}/window_${window}"
-    echo "处理 context window = ${window}"
-    
-    # 运行数据处理脚本
+    echo "Processing context window = ${window}"
+
+    # Run data processing script
     srun python ../create_data.py \
         --data_paths "${DATASETS[@]}" \
         --model_name "meta-llama/Llama-2-7b-chat-hf" \
@@ -48,17 +48,17 @@ for window in "${CONTEXT_WINDOWS[@]}"; do
         --max_length 2048 \
         --context_window $window
 
-    # 检查运行状态
+    # Check run status
     if [ $? -ne 0 ]; then
-        echo "处理 context window = ${window} 时失败"
+        echo "Failed while processing context window = ${window}"
         exit 1
     fi
 done
 
-echo "所有context window处理完成"
+echo "All context windows processed"
 
-# 统计生成的数据集
-echo "生成的数据集统计："
+# Statistics for generated datasets
+echo "Generated dataset statistics:"
 for window in "${CONTEXT_WINDOWS[@]}"; do
     echo "Context Window = ${window}:"
     OUTPUT_DIR="${BASE_OUTPUT_DIR}/window_${window}"

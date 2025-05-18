@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-收集所有词语的语义变化数据，包括JSD和熵值
-从已生成的CSV文件中读取，合并为汇总CSV文件
+Collect semantic shift data for all words, including JSD and entropy values
+Read from generated CSV files and merge into summary CSV files
 """
 
 import os
@@ -13,23 +13,23 @@ import concurrent.futures
 from typing import List, Dict, Tuple, Optional, Any
 from logger_config import setup_logger
 
-# 设置日志
+# Set up logging
 logger = setup_logger('collect_semantic_data', 'logs/collect_semantic_data.log')
 
-def load_and_combine_csv_files(file_pattern: str, description: str = "数据") -> Optional[pd.DataFrame]:
+def load_and_combine_csv_files(file_pattern: str, description: str = "Data") -> Optional[pd.DataFrame]:
     """
-    加载并合并符合指定模式的所有CSV文件
+    Load and combine all CSV files matching the specified pattern
     
-    参数:
-        file_pattern: 文件路径匹配模式，使用glob格式
-        description: 数据类型描述，用于日志记录
+    Args:
+        file_pattern: File path pattern using glob format
+        description: Data type description for logging
         
-    返回:
-        合并的DataFrame，如果没有文件则返回None
+    Returns:
+        Combined DataFrame, returns None if no files are found
     """
     files = glob.glob(file_pattern)
     if not files:
-        logger.warning(f"未找到匹配 {file_pattern} 的CSV文件")
+        logger.warning(f"No CSV files found matching {file_pattern}")
         return None
     
     dataframes = []
@@ -37,76 +37,76 @@ def load_and_combine_csv_files(file_pattern: str, description: str = "数据") -
         try:
             df = pd.read_csv(file)
             dataframes.append(df)
-            logger.info(f"已读取 {file}")
+            logger.info(f"Read {file}")
         except Exception as e:
-            logger.error(f"读取 {file} 时出错: {str(e)}")
+            logger.error(f"Error reading {file}: {str(e)}")
     
     if not dataframes:
-        logger.error(f"未找到任何有效的{description}文件")
+        logger.error(f"No valid {description} files found")
         return None
     
     combined_df = pd.concat(dataframes, ignore_index=True)
-    logger.info(f"已合并 {len(combined_df)} 行{description}")
+    logger.info(f"Combined {len(combined_df)} rows of {description}")
     
     return combined_df
 
 def process_word_directory(args: Tuple[str, str, str, str]) -> Dict[str, Any]:
     """
-    处理单个词语目录，加载其JSD和熵值数据
+    Process a single word directory, load its JSD and entropy data
     
-    参数:
-        args: 包含(word_dir, base_dir, time_bin_level, full_path)的元组
+    Args:
+        args: Tuple containing (word_dir, base_dir, time_bin_level, full_path)
         
-    返回:
-        包含该词语所有数据的字典
+    Returns:
+        Dictionary containing all data for the word
     """
     word_dir, base_dir, time_bin_level, full_path = args
     result = {"word": word_dir}
     
-    # 查找该词语的JSD CSV文件
+    # Find JSD CSV file for the word
     jsd_pattern = os.path.join(full_path, f"jsd_changes_{time_bin_level}_*.csv")
-    df_jsd = load_and_combine_csv_files(jsd_pattern, f"词语 '{word_dir}' 的JSD数据")
+    df_jsd = load_and_combine_csv_files(jsd_pattern, f"JSD data for word '{word_dir}'")
     result["jsd"] = df_jsd
     
-    # 查找该词语的熵值CSV文件
+    # Find entropy CSV file for the word
     entropy_pattern = os.path.join(full_path, f"entropy_changes_{time_bin_level}_*.csv")
-    df_entropy = load_and_combine_csv_files(entropy_pattern, f"词语 '{word_dir}' 的熵值数据")
+    df_entropy = load_and_combine_csv_files(entropy_pattern, f"Entropy data for word '{word_dir}'")
     result["entropy"] = df_entropy
     
-    # 查找该词语的多义词意思熵值CSV文件
+    # Find meaning entropy CSV file for the word
     meaning_pattern = os.path.join(full_path, f"meaning_entropy_changes_{time_bin_level}_*.csv")
-    df_meaning = load_and_combine_csv_files(meaning_pattern, f"词语 '{word_dir}' 的多义词意思熵值数据")
+    df_meaning = load_and_combine_csv_files(meaning_pattern, f"Meaning entropy data for word '{word_dir}'")
     result["meaning_entropy"] = df_meaning
     
     return result
 
 def collect_all_data(base_dir: str = 'semantic_shift_plots', time_bin_level: str = 'period') -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
     """
-    并行收集所有词语的JSD和熵值数据
+    Collect JSD and entropy data for all words in parallel
     
-    参数:
-        base_dir: 包含所有词语目录的基础目录
-        time_bin_level: 时间分组级别 ('period' 或 'year')
+    Args:
+        base_dir: Base directory containing all word directories
+        time_bin_level: Time binning level ('period' or 'year')
     
-    返回:
-        (combined_jsd, combined_entropy, combined_meaning_entropy)元组
+    Returns:
+        Tuple (combined_jsd, combined_entropy, combined_meaning_entropy)
     """
-    # 获取所有词语目录
+    # Get all word directories
     word_dirs = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
-    logger.info(f"发现 {len(word_dirs)} 个词语目录")
+    logger.info(f"Found {len(word_dirs)} word directories")
     
     all_jsd_data = []
     all_entropy_data = []
     all_meaning_entropy_data = []
     
-    # 准备并行处理的参数
+    # Prepare arguments for parallel processing
     process_args = [(word_dir, base_dir, time_bin_level, os.path.join(base_dir, word_dir)) for word_dir in word_dirs]
     
-    # 并行处理所有词语目录
+    # Process all word directories in parallel
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = list(executor.map(process_word_directory, process_args))
     
-    # 整理结果
+    # Organize results
     for result in results:
         if result["jsd"] is not None:
             all_jsd_data.append(result["jsd"])
@@ -115,69 +115,69 @@ def collect_all_data(base_dir: str = 'semantic_shift_plots', time_bin_level: str
         if result["meaning_entropy"] is not None:
             all_meaning_entropy_data.append(result["meaning_entropy"])
     
-    # 合并所有词语的JSD数据
+    # Combine JSD data for all words
     combined_jsd = None
     if all_jsd_data:
         combined_jsd = pd.concat(all_jsd_data, ignore_index=True)
-        logger.info(f"总共合并了 {len(combined_jsd)} 行JSD数据")
+        logger.info(f"Total combined {len(combined_jsd)} rows of JSD data")
     else:
-        logger.error("未找到任何JSD数据文件")
+        logger.error("No JSD data files found")
     
-    # 合并所有词语的熵值数据
+    # Combine entropy data for all words
     combined_entropy = None
     if all_entropy_data:
         combined_entropy = pd.concat(all_entropy_data, ignore_index=True)
-        logger.info(f"总共合并了 {len(combined_entropy)} 行熵值数据")
+        logger.info(f"Total combined {len(combined_entropy)} rows of entropy data")
     else:
-        logger.error("未找到任何熵值数据文件")
+        logger.error("No entropy data files found")
     
-    # 合并所有多义词的意思熵值数据
+    # Combine meaning entropy data for all words
     combined_meaning_entropy = None
     if all_meaning_entropy_data:
         combined_meaning_entropy = pd.concat(all_meaning_entropy_data, ignore_index=True)
-        logger.info(f"总共合并了 {len(combined_meaning_entropy)} 行多义词意思熵值数据")
+        logger.info(f"Total combined {len(combined_meaning_entropy)} rows of meaning entropy data")
     
     return combined_jsd, combined_entropy, combined_meaning_entropy
 
 def save_data_and_create_pivot(df: pd.DataFrame, output_dir: str, file_prefix: str, 
                               time_bin_level: str, pivot_params: Dict[str, Any]) -> None:
     """
-    保存数据并创建交叉表
+    Save data and create a pivot table
     
-    参数:
-        df: 要保存的数据框
-        output_dir: 输出目录
-        file_prefix: 文件名前缀
-        time_bin_level: 时间分组级别
-        pivot_params: 创建交叉表的参数
+    Args:
+        df: DataFrame to save
+        output_dir: Output directory
+        file_prefix: File name prefix
+        time_bin_level: Time binning level
+        pivot_params: Parameters for creating the pivot table
     """
-    # 保存合并后的数据
-    output_file = os.path.join(output_dir, f'{file_prefix}_{time_bin_level}.csv')
+    # Save combined data
+    output_file = os.path.join(output_dir, f"{file_prefix}_{time_bin_level}.csv")
     df.to_csv(output_file, index=False)
-    logger.info(f"已将数据保存至 {output_file}")
+    logger.info(f"Data saved to {output_file}")
     
-    # 创建交叉表
+    # Create pivot table
     try:
         pivot_df = pd.pivot_table(df, **pivot_params)
-        pivot_output = os.path.join(output_dir, f'{file_prefix}_by_word_time_{time_bin_level}.csv')
+        pivot_output = os.path.join(output_dir, f"{file_prefix}_by_word_time_{time_bin_level}.csv")
         pivot_df.to_csv(pivot_output)
-        logger.info(f"已创建交叉表，保存至 {pivot_output}")
+        logger.info(f"Pivot table created, saved to {pivot_output}")
     except Exception as e:
-        logger.error(f"创建交叉表时出错: {str(e)}")
+        logger.error(f"Error creating pivot table: {str(e)}")
 
 def main():
-    """主函数"""
+    """Main function"""
     base_dir = 'semantic_shift_plots'
-    time_bin_level = 'period'  # 可选 'year' 或 'period'
+    time_bin_level = 'period'  # Optional 'year' or 'period'
     output_dir = 'semantic_shift_summary'
     
-    # 创建输出目录
+    # Create output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # 并行收集所有数据
+    # Collect all data in parallel
     combined_jsd, combined_entropy, combined_meaning_entropy = collect_all_data(base_dir, time_bin_level)
     
-    # 处理JSD数据
+    # Process JSD data
     if combined_jsd is not None:
         save_data_and_create_pivot(
             combined_jsd, 
@@ -192,7 +192,7 @@ def main():
             }
         )
     
-    # 处理熵值数据
+    # Process entropy data
     if combined_entropy is not None:
         save_data_and_create_pivot(
             combined_entropy, 
@@ -207,11 +207,11 @@ def main():
             }
         )
     
-    # 处理多义词意思熵值数据
+    # Process meaning entropy data
     if combined_meaning_entropy is not None:
-        output_file = os.path.join(output_dir, f'all_words_meaning_entropy_{time_bin_level}.csv')
+        output_file = os.path.join(output_dir, f"all_words_meaning_entropy_{time_bin_level}.csv")
         combined_meaning_entropy.to_csv(output_file, index=False)
-        logger.info(f"已将所有多义词的意思熵值数据保存至 {output_file}")
+        logger.info(f"All meaning entropy data saved to {output_file}")
 
 if __name__ == "__main__":
     main()

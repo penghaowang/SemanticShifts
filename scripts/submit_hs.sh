@@ -7,7 +7,7 @@
 #SBATCH --output=logs/submit_hs_%j.log  
 #SBATCH --error=logs/submit_hs_error_%j.log     
 #SBATCH --ntasks=4
-#SBATCH --account=a-a05
+#SBATCH --account=<your-account-id>
 #SBATCH --constraint=gpu
 #SBATCH --partition=debug
 #SBATCH --time=01:30:00
@@ -15,32 +15,32 @@
 module load python gcc cuda
 # load your env
 
-# 设置环境变量
-# Line removed by filter-repo due to potential secret
+# Set environment variables
+# export HUGGING_FACE_HUB_TOKEN=<your-token-here>
 export TOKENIZERS_PARALLELISM=false
-# Line removed by filter-repo due to potential secret
+# export HF_HOME="/path/to/your/hf/cache"
 
-# 设置日志目录
+# Set log directory
 LOG_DIR="logs/hidden_states"
 mkdir -p $LOG_DIR
 
-# 测试配置
+# Test configuration
 DATA_PATHS=("data/combined.csv")
 MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
 
-# 基础参数
+# Basic parameters
 BATCH_SIZE=8
 TEMPERATURE=0.3
 MAX_TOKENS=50
-PROMPT_TEMPLATE="icl_basic"  # 添加为超参数
+PROMPT_TEMPLATE="icl_basic"  # Add as hyperparameter
 
-# 不同的上下文窗口大小
+# Different context window sizes
 CONTEXT_WINDOWS=(0 1 3 5 10)
 
-# 修改层索引格式，使用逗号分隔而不是空格
+# Modify layer index format, use comma separation instead of space
 LAYER_INDICES="30"
 
-# 目标词列表
+# Target word list
 # TARGET_WORDS=(
 #     "import:NOUN" "export:NOUN" "money:NOUN" "price:NOUN" "product:NOUN"
 #     "sale:NOUN" "financial:ADJ" "net:ADJ"
@@ -56,10 +56,10 @@ LAYER_INDICES="30"
 #     "strong:ADJ" "stable:ADJ" "fair:ADJ" "competitive:ADJ")
 words=("market:NOUN" "rate:NOUN" "fair:ADJ")
 
-# 提取方法列表
+# List of extraction methods
 EXTRACTION_METHODS=("output_mean")
 
-# 定义运行单个任务的函数
+# Define function to run a single task
 run_task() {
     local target_word=$1
     local method=$2
@@ -68,15 +68,15 @@ run_task() {
     local context_window=$5
     
     local data_file=$(basename "$data_path")
-    local data_name="${data_file%.*}"  # 移除扩展名
+    local data_name="${data_file%.*}"  # Remove extension
     
-    # 将目标词中的冒号替换为下划线
+    # Replace colon in target word with underscore
     local safe_target_word=${target_word//:/_}
     
-    echo "=== 任务开始 ===" | tee -a "$LOG_DIR/test.log"
-    echo "GPU $gpu_id: ${target_word} - ${method} - ${data_path} - 上下文窗口: ${context_window}" | tee -a "$LOG_DIR/test.log"
+    echo "=== Task Start ===" | tee -a "$LOG_DIR/test.log"
+    echo "GPU $gpu_id: ${target_word} - ${method} - ${data_path} - Context window: ${context_window}" | tee -a "$LOG_DIR/test.log"
 
-    OUTPUT_DIR="/iopsstor/scratch/cscs/phwang/hidden_states_llama38B_cw${context_window}_${PROMPT_TEMPLATE}/${safe_target_word}/${method}/${data_name}"
+    OUTPUT_DIR="hidden_states/hidden_states_llama38B_cw${context_window}_${PROMPT_TEMPLATE}/${safe_target_word}/${method}/${data_name}"
     mkdir -p "$OUTPUT_DIR"
 
     {
@@ -99,46 +99,46 @@ run_task() {
             2>&1
     } | tee "$LOG_DIR/${safe_target_word}_${method}_${data_name}_cw${context_window}_gpu${gpu_id}.log"
 
-    # 检查运行状态
+    # Check run status
     if [ $? -eq 0 ]; then
-        echo "✓ 任务完成" | tee -a "$LOG_DIR/test.log"
+        echo "✓ Task Completed" | tee -a "$LOG_DIR/test.log"
     else:
-        echo "✗ 任务失败" | tee -a "$LOG_DIR/test.log"
+        echo "✗ Task Failed" | tee -a "$LOG_DIR/test.log"
     fi
 
     echo "=============" | tee -a "$LOG_DIR/test.log"
 }
 
-# 遍历目标词
+# Iterate through target words
 for TARGET_WORD in "${words[@]}"
 do
-    echo "开始处理: ${TARGET_WORD}" | tee -a "$LOG_DIR/test.log"
+    echo "Starting processing: ${TARGET_WORD}" | tee -a "$LOG_DIR/test.log"
     echo "=============" | tee -a "$LOG_DIR/test.log"
 
-    # 使用数组来跟踪后台进程
+    # Use an array to track background processes
     declare -a pids
     gpu_id=0
 
-    # 遍历上下文窗口大小
+    # Iterate through context window sizes
     for CONTEXT_WINDOW in "${CONTEXT_WINDOWS[@]}"
     do
-        # 遍历提取方法
+        # Iterate through extraction methods
         for METHOD in "${EXTRACTION_METHODS[@]}"
         do
-            # 遍历数据路径
+            # Iterate through data paths
             for DATA_PATH in "${DATA_PATHS[@]}"
             do
-                # 在指定GPU上运行任务并放入后台
+                # Run task on specified GPU and put in background
                 run_task "$TARGET_WORD" "$METHOD" "$DATA_PATH" "$gpu_id" "$CONTEXT_WINDOW" &
                 pids+=($!)
 
-                # 更新GPU ID，循环使用0-3
+                # Update GPU ID, loop through 0-3
                 gpu_id=$(( (gpu_id + 1) % 4 ))
 
-                # 如果已经启动了4个任务，等待其中一个完成
+                # If 4 tasks have been started, wait for one to complete
                 if [ ${#pids[@]} -eq 4 ]; then
-                    wait -n  # 等待任意一个子进程完成
-                    # 移除已完成的进程ID
+                    wait -n  # Wait for any child process to complete
+                    # Remove completed process ID
                     for pid in "${pids[@]}"; do
                         if ! kill -0 $pid 2>/dev/null; then
                             pids=("${pids[@]/$pid}")
@@ -149,8 +149,8 @@ do
         done
     done
 
-    # 等待所有剩余任务完成
+    # Wait for all remaining tasks to complete
     wait
 done
 
-echo "全部处理完成" | tee -a "$LOG_DIR/test.log" 
+echo "All processing complete" | tee -a "$LOG_DIR/test.log" 

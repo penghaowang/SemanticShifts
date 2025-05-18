@@ -6,30 +6,30 @@
 #SBATCH --output=logs/submit_rpd_%j.log  
 #SBATCH --error=logs/submit_rpd_error_%j.log     
 #SBATCH --ntasks=4
-#SBATCH --account=a-a05
+#SBATCH --account=<your-account-id>
 #SBATCH --constraint=gpu
 #SBATCH --partition=debug
 #SBATCH --time=00:30:00
 
-# 加载必要的模块
+# Load necessary modules
 module load python gcc cuda
 
-# 激活虚拟环境
+# Activate virtual environment
 # load your env
 
-# 设置环境变量
-# Line removed by filter-repo due to potential secret
+# Set environment variables
+# export HUGGING_FACE_HUB_TOKEN=<your-token-here>
 export TOKENIZERS_PARALLELISM=false
-# Line removed by filter-repo due to potential secret
+# export HF_HOME="/path/to/your/hf/cache"
 
-# 定义目标词（格式：word:POS）和提取方法列表
+# Define target words (format: word:POS) and list of extraction methods
 words=(
-    # 第一组词 - 名词
+    # First group of words - Nouns
     "market:NOUN" "rate:NOUN" "bank:NOUN" "interest:NOUN" "investment:NOUN"
     "bond:NOUN" "share:NOUN" "capital:NOUN" "exchange:NOUN" "tax:NOUN"
     "growth:NOUN" "security:NOUN" "company:NOUN" "dollar:NOUN" "debt:NOUN"
     "equity:NOUN" "profit:NOUN" "loss:NOUN" "gain:NOUN" "decline:NOUN"
-    # 第二组词 - 名词和形容词
+    # Second group of words - Nouns and Adjectives
     "import:NOUN" "export:NOUN" "money:NOUN" "price:NOUN" "product:NOUN" 
     "sale:NOUN" "agreement:NOUN" "annual:ADJ" "financial:ADJ" "net:ADJ" 
     "industrial:ADJ" "traditional:ADJ" "monetary:ADJ" "inflationary:ADJ" "foreign:ADJ" 
@@ -38,69 +38,69 @@ words=(
 )
 methods=("input_last_token" "eos_token" "input_mean" "output_mean" "output_eos")
 
-# 基础目录（根据实际情况调整）
-BASE_LABEL_DIR="/users/phwang/users/master_thesis2/labeled_data_o3_mini"
-BASE_HS_DIR="/iopsstor/scratch/cscs/phwang/hidden_states"
+# Base directory (adjust according to actual situation)
+BASE_LABEL_DIR="labeled_data"
+BASE_HS_DIR="hidden_states"
 OUTPUT_DIR_BASE="diachronic_plots"
-DIM_REDUCE_METHOD="umap"  # 可选: 'pca', 'tsne', 'umap', 'zca_pca', 'zca_tsne', 'zca_umap'
+DIM_REDUCE_METHOD="umap"  # Optional: 'pca', 'tsne', 'umap', 'zca_pca', 'zca_tsne', 'zca_umap'
 
-# 定义层配置
+# Define layer configuration
 LAYER_CONFIGS=(
     "24-31"
 )
 
-# 创建日志目录
+# Create log directory
 mkdir -p logs
 
-# 遍历每个词和提取方法
+# Iterate through each word and extraction method
 for word in "${words[@]}"; do
-    # 将冒号替换为下划线，构成目录名（如：import:NOUN -> import_NOUN）
+    # Replace colon with underscore to form directory name (e.g., import:NOUN -> import_NOUN)
     word_folder=$(echo "$word" | sed 's/:/_/g')
-    
-    echo "开始处理 $word (目录：$word_folder) 提取方法: $method"
-    
+
+    echo "Starting processing $word (Directory: $word_folder) Extraction method: $method"
+
     for method in "${methods[@]}"; do
         for layer_config in "${LAYER_CONFIGS[@]}"; do
-            echo "正在处理 $word ($method) - 层配置: $layer_config - 降维方法: $DIM_REDUCE_METHOD"
+            echo "Processing $word ($method) - Layer Config: $layer_config - Dim Reduction: $DIM_REDUCE_METHOD"
 
-            # 隐藏状态文件：在 BASE_HS_DIR/word_folder/method/combined 下查找最新的 hidden_states_* 目录
+            # Hidden states directory: Find the latest hidden_states_* directory under BASE_HS_DIR/word_folder/method/combined
             hs_dir_pattern="${BASE_HS_DIR}/${word_folder}/${method}/combined/hidden_states_*"
             hs_dir=$(ls -d $hs_dir_pattern 2>/dev/null | sort | tail -n 1)
             if [ -z "$hs_dir" ]; then
-                echo "未找到隐藏状态目录匹配模式: $hs_dir_pattern"
+                echo "Hidden states directory matching pattern not found: $hs_dir_pattern"
                 continue
             fi
             HIDDEN_STATES_FILE="${hs_dir}"
             if [ ! -d "$HIDDEN_STATES_FILE" ]; then
-                echo "隐藏状态目录不存在: $HIDDEN_STATES_FILE"
+                echo "Hidden states directory does not exist: $HIDDEN_STATES_FILE"
                 continue
             fi
 
-            # 句子 CSV 文件：在 BASE_HS_DIR/word_folder/method/combined 下查找最新的 icl_basic_${method}_${word_folder}_* 目录，
+            # Sentence CSV file: Find the latest icl_basic_${method}_${word_folder}_* directory under BASE_HS_DIR/word_folder/method/combined
             sentence_dir_pattern="${BASE_HS_DIR}/${word_folder}/${method}/combined/icl_basic_${method}_${word_folder}_*"
             sentence_dir=$(ls -d $sentence_dir_pattern 2>/dev/null | sort | tail -n 1)
             if [ -z "$sentence_dir" ]; then
-                echo "未找到句子 CSV 目录匹配模式: $sentence_dir_pattern"
+                echo "Sentence CSV directory matching pattern not found: $sentence_dir_pattern"
                 continue
             fi
             SENTENCE_CSV="${sentence_dir}/icl_basic_${method}_${word_folder}.csv"
             if [ ! -f "$SENTENCE_CSV" ]; then
-                echo "句子 CSV 文件不存在: $SENTENCE_CSV"
+                echo "Sentence CSV file does not exist: $SENTENCE_CSV"
                 continue
             fi
 
-            # 标签 CSV 文件：在 BASE_LABEL_DIR 下查找对应的标签文件
+            # Label CSV file: Find the corresponding label file under BASE_LABEL_DIR
             LABEL_CSV="${BASE_LABEL_DIR}/${word_folder}_labeled.csv"
             if [ ! -f "$LABEL_CSV" ]; then
-                echo "标签 CSV 文件不存在: $LABEL_CSV"
+                echo "Label CSV file does not exist: $LABEL_CSV"
                 continue
             fi
 
-            # 输出目录：按词、方法和层配置保存
+            # Output directory: Save by word, method, and layer configuration
             OUTPUT_DIR="${OUTPUT_DIR_BASE}/${word_folder}/${method}/${layer_config}_${DIM_REDUCE_METHOD}"
             mkdir -p "$OUTPUT_DIR"
 
-            # 使用 srun 调用 Python 脚本
+            # Use srun to call Python script
             srun python ../plot/run_plot_diachronic.py \
               --hidden_states_dir "$HIDDEN_STATES_FILE" \
               --sentence_csv "$SENTENCE_CSV" \
@@ -111,10 +111,10 @@ for word in "${words[@]}"; do
               --word "$word" \
               --extraction_method "$method"
 
-            echo "完成 $word ($method) - 层 $layer_config - 降维方法 $DIM_REDUCE_METHOD"
+            echo "Completed $word ($method) - Layer $layer_config - Dim Reduction $DIM_REDUCE_METHOD"
         done
-        echo "处理 $word ($method) 完成。"
+        echo "Processing $word ($method) completed."
     done
 done
 
-echo "所有任务完成。"
+echo "All tasks completed."

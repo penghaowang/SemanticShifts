@@ -20,45 +20,45 @@ def set_seed(seed: int = 42):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # 必需参数
+    # Required arguments
     parser.add_argument('--dataset_paths', type=str, nargs='+', required=True,
-                      help='数据集路径列表')
+                      help='List of dataset paths')
     parser.add_argument('--model_name', type=str, required=True,
-                      help='模型名称或路径')
+                      help='Model name or path')
     parser.add_argument('--target_words', type=str, required=True,
-                      help='目标词和词性，格式为"word,POS"，多个词用空格分隔')
+                      help='Target words and POS tags, format "word,POS", separated by space')
     
-    # 可选参数
+    # Optional arguments
     parser.add_argument('--batch_size', type=int, default=32,
-                      help='批处理大小')
+                      help='Batch size')
     parser.add_argument('--max_length', type=int, default=2048,
-                      help='最大序列长度')
+                      help='Maximum sequence length')
     parser.add_argument('--num_workers', type=int, default=4,
-                      help='数据加载的工作进程数')
+                      help='Number of worker processes for data loading')
     parser.add_argument('--output_dir', type=str, default="datasets",
-                      help='输出目录')
+                      help='Output directory')
     parser.add_argument('--context_mode', type=str, default="sentence",
                       choices=['sentence', 'token'],
-                      help='上下文模式：sentence或token')
+                      help='Context mode: sentence or token')
     parser.add_argument('--context_window', type=int, default=3,
-                      help='上下文窗口大小')
+                      help='Context window size')
     parser.add_argument('--duplicate_handling', type=str, default="mask",
                       choices=['mask', 'remove'],
-                      help='重复处理方式')
+                      help='Duplicate handling method')
     parser.add_argument('--test_batches', type=int, default=None,
-                      help='测试用的批次数量，None表示处理全部数据')
+                      help='Number of batches for testing, None means process all data')
     parser.add_argument('--seed', type=int, default=42,
-                      help='随机种子')
+                      help='Random seed')
     return parser.parse_args()
 
 def main():
-    # 解析参数
+    # Parse arguments
     args = parse_args()
     
-    # 设置随机种子
+    # Set random seed
     set_seed(args.seed)
     
-    # 设置日志
+    # Set up logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -68,35 +68,35 @@ def main():
         ]
     )
     
-    # 创建输出目录
+    # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # 解析目标词和词性
+    # Parse target words and POS tags
     target_words = []
     for word_pos in args.target_words.split():
         word, pos = word_pos.split(',')
         target_words.append((word, pos))
     
-    logging.info(f"目标词: {target_words}")
+    logging.info(f"Target words: {target_words}")
     
-    # 加载tokenizer
-    logging.info(f"加载tokenizer: {args.model_name}")
+    # Load tokenizer
+    logging.info(f"Loading tokenizer: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     
-    # 加载数据集
+    # Load datasets
     dfs = []
     for path in args.dataset_paths:
-        logging.info(f"加载数据集: {path}")
+        logging.info(f"Loading dataset: {path}")
         df = pd.read_csv(path)
-        logging.info(f"列名: {df.columns.tolist()}")
-        logging.info(f"加载了 {len(df)} 条记录")
+        logging.info(f"Column names: {df.columns.tolist()}")
+        logging.info(f"Loaded {len(df)} records")
         dfs.append(df)
     
-    # 合并数据集
+    # Concatenate datasets
     df = pd.concat(dfs, ignore_index=True)
-    logging.info(f"合并后总记录数: {len(df)}")
+    logging.info(f"Total records after concatenation: {len(df)}")
     
-    # 初始化数据加载器
+    # Initialize data loader
     dataloader = CustomDataLoader(
         tokenizer=tokenizer,
         target_words=target_words,
@@ -108,16 +108,16 @@ def main():
         duplicate_handling=args.duplicate_handling
     )
     
-    # 加载并处理数据集
+    # Load and process datasets
     try:
-        logging.info(f"开始处理数据集")
+        logging.info(f"Starting dataset processing")
         
-        # 为每个目标词分别处理
+        # Process each target word separately
         for word, pos in target_words:
             word_pos_dir = f"{word}_{pos}"
             logging.info(f"Processing {word}:{pos}")
             
-            # 设置该词的输出目录
+            # Set output directory for the word
             word_output_dir = os.path.join(
                 args.output_dir,
                 f"context_{args.context_window}_{args.context_mode}",
@@ -125,28 +125,28 @@ def main():
             )
             os.makedirs(word_output_dir, exist_ok=True)
             
-            # 处理该词的数据集
+            # Process dataset for the word
             dataset = dataloader.load_dataset(
                 data_paths=args.dataset_paths,
                 target_word=(word, pos),
-                split_ratio=0  # 不分割测试集
+                split_ratio=0  # Do not split for test set
             )
             
-            # 保存该词的数据集
+            # Save dataset for the word
             dataset.save_to_disk(word_output_dir)
-            logging.info(f"数据集已保存到: {word_output_dir}")
+            logging.info(f"Dataset saved to: {word_output_dir}")
             
-            # 打印数据集统计信息
+            # Print dataset statistics
             if isinstance(dataset, dict):
                 for split, ds in dataset.items():
-                    logging.info(f"{split} 集大小: {len(ds)}")
-                    logging.info(f"数据集特征: {ds.features}")
+                    logging.info(f"{split} set size: {len(ds)}")
+                    logging.info(f"Dataset features: {ds.features}")
             else:
-                logging.info(f"数据集大小: {len(dataset)}")
-                logging.info(f"数据集特征: {dataset.features}")
+                logging.info(f"Dataset size: {len(dataset)}")
+                logging.info(f"Dataset features: {dataset.features}")
             
     except Exception as e:
-        logging.error(f"处理数据集时出错: {str(e)}")
+        logging.error(f"Error during dataset processing: {str(e)}")
         raise
 
 if __name__ == '__main__':

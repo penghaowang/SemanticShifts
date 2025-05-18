@@ -14,10 +14,10 @@ import subprocess
 import pandas as pd
 import traceback
 
-# 导入自定义日志配置
+# Import custom logger configuration
 from logger_config import setup_logger, TRACE
 
-# 设置模块特定的日志记录器
+# Set up module-specific logger
 logger = setup_logger('run_analysis', 'logs/run_analysis.log')
 
 def find_hidden_states_files(base_dir):
@@ -36,7 +36,7 @@ def find_hidden_states_files(base_dir):
     
     # Remove duplicates and sort
     unique_files = sorted(set(all_files))
-    logger.info(f"找到 {len(unique_files)} 个隐藏状态文件")
+    logger.info(f"Found {len(unique_files)} hidden state files")
     
     return unique_files
 
@@ -55,10 +55,10 @@ def find_word_data(base_dir):
     
     # Return the first file found, or None
     if all_files:
-        logger.info(f"找到词数据文件: {all_files[0]}")
+        logger.info(f"Found word data file: {all_files[0]}")
         return all_files[0]
     else:
-        logger.warning("未找到词数据文件")
+        logger.warning("Word data file not found")
         return None
 
 def run_analysis(hidden_states_file, word_data_file, output_dir, reduction_method):
@@ -76,23 +76,23 @@ def run_analysis(hidden_states_file, word_data_file, output_dir, reduction_metho
         cmd.extend(["--word_data_path", word_data_file])
     
     # Log the command
-    logger.info(f"运行命令: {' '.join(cmd)}")
+    logger.info(f"Running command: {' '.join(cmd)}")
     
     # Execute the command
     try:
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        logger.info(f"完成对 {hidden_states_file} 的分析")
+        logger.info(f"Completed analysis for {hidden_states_file}")
         return True
     except subprocess.CalledProcessError as e:
-        logger.error(f"分析 {hidden_states_file} 时出错: {e}")
-        logger.error(f"标准输出: {e.stdout}")
-        logger.error(f"标准错误: {e.stderr}")
+        logger.error(f"Error analyzing {hidden_states_file}: {e}")
+        logger.error(f"Standard output: {e.stdout}")
+        logger.error(f"Standard error: {e.stderr}")
         logger.debug(traceback.format_exc())
         return False
 
 def main(args):
     """Main function to analyze all hidden states files"""
-    # 如果指定了自定义日志文件，重新配置日志记录器
+    # If a custom log file is specified, reconfigure the logger
     if args.log_file != 'logs/run_analysis.log':
         global logger
         logger = setup_logger('run_analysis', args.log_file)
@@ -101,7 +101,7 @@ def main(args):
     hidden_states_files = find_hidden_states_files(args.input_dir)
     
     if not hidden_states_files:
-        logger.error(f"在 {args.input_dir} 中未找到隐藏状态文件")
+        logger.error(f"No hidden state files found in {args.input_dir}")
         return
     
     # Find word data file
@@ -113,7 +113,7 @@ def main(args):
     # Process each file
     successful = 0
     for i, hidden_states_file in enumerate(hidden_states_files):
-        logger.info(f"处理文件 {i+1}/{len(hidden_states_files)}: {hidden_states_file}")
+        logger.info(f"Processing file {i+1}/{len(hidden_states_files)}: {hidden_states_file}")
         
         # Create subdirectory based on file name
         file_base_name = Path(hidden_states_file).stem
@@ -137,22 +137,22 @@ def main(args):
         if success:
             successful += 1
     
-    logger.info(f"分析完成。成功处理了 {successful}/{len(hidden_states_files)} 个文件。")
+    logger.info(f"Analysis completed. Successfully processed {successful}/{len(hidden_states_files)} files.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="批量分析隐藏状态文件")
+    parser = argparse.ArgumentParser(description="Batch analyze hidden state files")
     
     parser.add_argument('--input_dir', type=str, required=True,
-                        help='包含隐藏状态文件的目录')
+                        help='Directory containing hidden state files')
     parser.add_argument('--word_data_path', type=str, default=None,
-                        help='包含词信息的CSV文件路径（可选）')
+                        help='Path to CSV file containing word information (optional)')
     parser.add_argument('--output_dir', type=str, default="analysis_results",
-                        help='保存分析输出的目录')
+                        help='Directory to save analysis output')
     parser.add_argument('--reduction_method', type=str, default='pca',
                         choices=['pca', 'tsne'],
-                        help='可视化的降维方法')
+                        help='Dimensionality reduction method for visualization')
     parser.add_argument('--log_file', type=str, default='logs/run_analysis.log',
-                        help='日志文件路径')
+                        help='Log file path')
     
     args = parser.parse_args()
     main(args)

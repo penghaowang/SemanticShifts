@@ -6,7 +6,7 @@ import os
 import glob
 import pandas as pd
 from collections import Counter, defaultdict
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans
 from scipy.interpolate import make_interp_spline
 import matplotlib.cm as cm
 from evaluate import (
@@ -247,185 +247,6 @@ def plot_hidden_states_layers_clusters(
         )
 
 
-def plot_hidden_states_spontaneous_clusters(
-    hidden_states,
-    df=None,
-    content_column='generated_content',
-    eps=0.5,
-    min_samples=5,
-    method='pca',
-    title='Spontaneous Clustering (DBSCAN)',
-    save_path=None,
-    show_plot=False,
-    top_n=3
-):
-    """
-    Use DBSCAN for clustering (no predefined cluster count) and show most common content.
-
-    Parameters:
-        hidden_states: [N, hidden_dim]
-        df: DataFrame with rows matching hidden_states
-        content_column: Column with text content
-        eps: DBSCAN eps parameter
-        min_samples: DBSCAN min_samples parameter
-        method: Dimension reduction method
-        title: Plot title
-        save_path: Path to save plot
-        show_plot: Whether to show plot
-        top_n: Number of most common contents to show per cluster
-    """
-    if isinstance(hidden_states, torch.Tensor):
-        hidden_states = hidden_states.cpu().numpy()
-
-    reduced_vectors = reduce_dimensions(hidden_states, method=method, n_components=2)
-
-    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-    cluster_labels = dbscan.fit_predict(reduced_vectors)
-
-    plt.figure(figsize=(6,5))
-
-    unique_clusters = np.unique(cluster_labels)
-    cmap = plt.cm.get_cmap('rainbow', len(unique_clusters))
-
-    cluster_info = []
-
-    for i, c in enumerate(unique_clusters):
-        idx = np.where(cluster_labels == c)[0]
-        color = cmap(i)
-
-        if c == -1:
-            cluster_name = "Outliers"
-        else:
-            if df is not None and content_column in df.columns:
-                sub_df = df.iloc[idx]
-                contents = sub_df[content_column].tolist()
-                rep_content = find_most_rep(contents)
-                if not rep_content:
-                    cluster_name = f"Cluster {c} (Empty?)"
-                else:
-                    cluster_name = f"Cluster {c}: {rep_content}"
-                    
-                    if c != -1:  # Ignore noise points
-                        most_common = Counter(sub_df[content_column]).most_common(top_n)
-                        cluster_info.append((c, most_common))
-            else:
-                cluster_name = f"Cluster {c}"
-
-        plt.scatter(
-            reduced_vectors[idx, 0],
-            reduced_vectors[idx, 1],
-            color=color,
-            alpha=0.7,
-            label=cluster_name
-        )
-
-    plt.legend(title="Clusters", bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.title(title)
-    plt.xlabel("Component 1")
-    plt.ylabel("Component 2")
-    plt.grid(True)
-
-    if cluster_info:
-        footer_text = []
-        for c, contents in cluster_info:
-            text = [f"Cluster {c}:"]
-            for cont, cnt in contents:
-                text.append(f"  {cont} ({cnt})")
-            footer_text.append("\n".join(text))
-        
-        plt.figtext(0.1, -0.1, "\n\n".join(footer_text), 
-                   va="top", fontsize=8, wrap=True)
-        plt.subplots_adjust(bottom=0.3)  # Adjust bottom margin
-
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Plot saved to {save_path}")
-
-    if show_plot:
-        plt.show()
-    else:
-        plt.close()
-
-def plot_hidden_states_layers_spontaneous_clusters(
-    hidden_states,
-    df=None,
-    content_column='generated_content',
-    eps=0.5,
-    min_samples=5,
-    method='umap',
-    save_dir='.',
-    show_plots=False,
-    top_n=3
-):
-    """
-    Plot DBSCAN clusters for each layer's hidden states.
-    
-    Parameters:
-        hidden_states: [N, L, (B), hidden_dim]
-        df: DataFrame with matching samples
-        content_column: Column with text content
-        eps: DBSCAN eps parameter
-        min_samples: DBSCAN min_samples parameter
-        method: Dimension reduction method
-        save_dir: Directory to save plots
-        show_plots: Whether to show plots
-        top_n: Number of most common contents to show per cluster
-    """
-    hs_np = prepare_hidden_states(hidden_states)
-
-    num_layers = hs_np.shape[1]
-    os.makedirs(save_dir, exist_ok=True)
-
-    for layer_idx in range(num_layers):
-        layer_data = hs_np[:, layer_idx, :]
-        layer_title = f'Layer {layer_idx+1} - Spontaneous Clustering (DBSCAN / {method.upper()})'
-        save_path = os.path.join(save_dir, f'layer_{layer_idx+1}_{method}_dbscan.png')
-
-        plot_hidden_states_spontaneous_clusters(
-            layer_data,
-            df=df,
-            content_column=content_column,
-            eps=eps,
-            min_samples=min_samples,
-            method=method,
-            title=layer_title,
-            save_path=save_path,
-            show_plot=show_plots,
-            top_n=top_n
-        )
-def plot_all_layers_together_dbscan(
-    hidden_states: torch.Tensor,
-    df=None,
-    content_column='generated_content',
-    eps=0.5,
-    min_samples=5,
-    method='pca',
-    save_path=None,
-    show_plot=False,
-    top_n=3
-):
-    """
-    Flatten multiple layers into single feature vector and cluster with DBSCAN.
-    """
-    hs_np = prepare_hidden_states(hidden_states)
-    
-    N, L, D = hs_np.shape
-    
-    # Flatten: combine features from all layers => [N, L*D]
-    flattened = hs_np.reshape(N, L * D)
-    
-    plot_hidden_states_spontaneous_clusters(
-        flattened,
-        df=df,
-        content_column=content_column,
-        eps=eps,
-        min_samples=min_samples,
-        method=method,
-        title=f"DBSCAN on All Layers Flattened ({method.upper()})",
-        save_path=save_path,
-        show_plot=show_plot,
-        top_n=top_n
-    )
 def plot_heatmap_layerwise(vec, save_path=None, show_plot=False):
     """
     Plot layer-wise heatmap
@@ -443,6 +264,7 @@ def plot_heatmap_layerwise(vec, save_path=None, show_plot=False):
         plt.show()
     else:
         plt.close()
+
 def plot_relative_similarity(vec, save_path=None, show_plot=False):
     """
     Plot relative similarity between adjacent layers as bar chart
@@ -561,7 +383,7 @@ def plot_word_trajectories(
         sentence_csv = os.path.join(sentence_dir, f"icl_basic_{extraction_method}_{os.path.basename(word_dir)}.csv")
         
         # Label CSV file
-        label_csv = os.path.join("/users/phwang/users/master_thesis2/labeled_data_o3_mini", f"{os.path.basename(word_dir)}_labeled.csv")
+        label_csv = os.path.join("labeled_data", f"{os.path.basename(word_dir)}_labeled.csv")
         
         if not os.path.exists(sentence_csv):
             if logger:

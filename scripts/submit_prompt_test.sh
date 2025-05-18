@@ -9,13 +9,13 @@
 #SBATCH --partition=normal   
 #SBATCH --constraint=gpu
 
-# 设置测试参数
+# Set test parameters
 WORD_TYPE="gain:NOUN"
 NUM_SAMPLES=20
 OUTPUT_DIR="outputs/prompt_test"
 EXTRACTION_METHOD="input_last_token"
 
-# 遍历不同的prompt模板
+# Iterate through different prompt templates
 for PROMPT_TEMPLATE in "basic" "context_aware" "finance" "icl_basic" "icl_detailed"
 do
     echo "Testing prompt template: ${PROMPT_TEMPLATE}"

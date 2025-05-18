@@ -14,11 +14,11 @@ from evaluate import reduce_dimensions, merge_label, get_time_periods
 from plot import fix_tensor_from_series, plot_word_trajectories
 from logger_config import setup_logger
 
-# 设置日志
+# Set up logging
 logger = setup_logger('plot_word_trajectory', 'logs/plot_word_trajectory.log')
 
 def main():
-    """处理命令行参数并调用绘图函数"""
+    """Process command line arguments and call plotting functions"""
     parser = argparse.ArgumentParser(description='Plot word trajectories over time')
     
     parser.add_argument('--base_dir', type=str, required=True,
